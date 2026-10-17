@@ -59,3 +59,9 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt --check
 ```
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) checks formatting, runs clippy
+with warnings as errors, then builds and tests the whole workspace on
+`ubuntu-latest`, `macos-latest` and `windows-latest`.

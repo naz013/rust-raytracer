@@ -25,14 +25,37 @@ impl Default for RenderSettings {
 }
 
 /// Renders `world` to a row-major list of linear colors, top row first.
-///
-/// Rows are rendered in parallel. Each row seeds its own `Rng` from its index,
-/// so the image is identical however the rows are spread over threads.
 pub fn render(camera: &Camera, world: &dyn Hittable, settings: &RenderSettings) -> Vec<Color> {
-    let width = camera.image_width as usize;
-    let samples = settings.samples_per_pixel.max(1);
+    render_samples(
+        camera,
+        world,
+        settings.max_depth,
+        settings.samples_per_pixel.max(1),
+        0,
+    )
+}
 
+/// Renders a single sample per pixel, for progressive rendering.
+///
+/// Each `pass` number draws from its own random streams, so averaging the
+/// results of passes `0..n` converges just like rendering `n` samples per pixel.
+pub fn render_pass(camera: &Camera, world: &dyn Hittable, max_depth: u32, pass: u32) -> Vec<Color> {
+    render_samples(camera, world, max_depth, 1, pass)
+}
+
+/// Averages `samples` rays per pixel. Rows are rendered in parallel, and each
+/// row seeds its own `Rng` from `(pass, row)`, so the image is identical
+/// however the rows are spread over threads.
+fn render_samples(
+    camera: &Camera,
+    world: &dyn Hittable,
+    max_depth: u32,
+    samples: u32,
+    pass: u32,
+) -> Vec<Color> {
+    let width = camera.image_width as usize;
     let mut pixels = vec![Color::ZERO; width * camera.image_height as usize];
+
     // `par_chunks_mut` hands each thread its own row as a `&mut [Color]`.
     // The rows don't overlap, so the borrow checker allows mutating them in parallel.
     pixels
@@ -40,12 +63,12 @@ pub fn render(camera: &Camera, world: &dyn Hittable, settings: &RenderSettings) 
         .enumerate()
         .for_each(|(j, row)| {
             let j = j as u32;
-            let mut rng = Rng::new(u64::from(j));
+            let mut rng = Rng::new((u64::from(pass) << 32) | u64::from(j));
             for (pixel, i) in row.iter_mut().zip(0u32..) {
                 let mut sum = Color::ZERO;
                 for _ in 0..samples {
                     let ray = camera.get_ray(i, j, &mut rng);
-                    sum += ray_color(&ray, world, settings.max_depth, &mut rng);
+                    sum += ray_color(&ray, world, max_depth, &mut rng);
                 }
                 *pixel = sum / f64::from(samples);
             }
@@ -136,6 +159,14 @@ mod tests {
             render(&camera, &world, &settings),
             render(&camera, &world, &settings)
         );
+    }
+
+    #[test]
+    fn passes_are_deterministic_but_differ_from_each_other() {
+        let (camera, world) = tiny_scene();
+        let pass0 = render_pass(&camera, &world, 5, 0);
+        assert_eq!(pass0, render_pass(&camera, &world, 5, 0));
+        assert_ne!(pass0, render_pass(&camera, &world, 5, 1));
     }
 
     #[test]

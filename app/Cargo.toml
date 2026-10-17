@@ -1,0 +1,9 @@
+[package]
+name = "app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tracer.workspace = true
+image.workspace = true
+eframe.workspace = true

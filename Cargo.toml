@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["tracer", "cli"]
+members = ["tracer", "cli", "app"]
 
 [workspace.package]
 version = "0.1.0"
@@ -10,3 +10,12 @@ edition = "2024"
 tracer = { path = "tracer" }
 image = { version = "0.25", default-features = false, features = ["png"] }
 rayon = "1.10"
+eframe = { version = "0.37", default-features = false, features = ["accesskit", "default_fonts", "glow", "wayland", "x11"] }
+
+# Ray tracing in an unoptimized build is painfully slow. Optimize the tracer
+# and all dependencies even in dev builds; our own UI/CLI code stays debuggable.
+[profile.dev.package.tracer]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 2

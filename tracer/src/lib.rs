@@ -17,7 +17,7 @@ pub use camera::{Camera, CameraConfig};
 pub use hittable::{HitRecord, Hittable, HittableList};
 pub use material::Material;
 pub use ray::Ray;
-pub use render::{RenderSettings, render, to_rgb8};
+pub use render::{RenderSettings, render, render_pass, to_rgb8};
 pub use rng::Rng;
 pub use scene::Scene;
 pub use sphere::Sphere;

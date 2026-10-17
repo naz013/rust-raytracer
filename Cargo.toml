@@ -9,3 +9,4 @@ edition = "2024"
 [workspace.dependencies]
 tracer = { path = "tracer" }
 image = { version = "0.25", default-features = false, features = ["png"] }
+rayon = "1.10"

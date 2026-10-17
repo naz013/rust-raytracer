@@ -51,6 +51,26 @@ impl Vec3 {
     pub fn lerp(self, other: Self, t: f64) -> Self {
         (1.0 - t) * self + t * other
     }
+
+    /// True if every component is close to zero.
+    pub fn near_zero(self) -> bool {
+        const EPS: f64 = 1e-8;
+        self.x.abs() < EPS && self.y.abs() < EPS && self.z.abs() < EPS
+    }
+
+    /// Mirror reflection of `self` about the surface normal `n` (unit length).
+    pub fn reflect(self, n: Self) -> Self {
+        self - 2.0 * self.dot(n) * n
+    }
+
+    /// Refraction of the unit vector `self` through a surface with unit normal `n`
+    /// (pointing against `self`), by Snell's law with `eta_ratio = η_in / η_out`.
+    pub fn refract(self, n: Self, eta_ratio: f64) -> Self {
+        let cos_theta = (-self).dot(n).min(1.0);
+        let r_out_perp = eta_ratio * (self + cos_theta * n);
+        let r_out_parallel = -(1.0 - r_out_perp.length_squared()).abs().sqrt() * n;
+        r_out_perp + r_out_parallel
+    }
 }
 
 impl Add for Vec3 {
@@ -162,5 +182,52 @@ mod tests {
         assert_eq!(a.lerp(b, 0.0), a);
         assert_eq!(a.lerp(b, 1.0), b);
         assert_eq!(a.lerp(b, 0.5), Vec3::new(1.0, 2.0, 3.0));
+    }
+
+    #[test]
+    fn near_zero() {
+        assert!(Vec3::new(1e-9, -1e-9, 0.0).near_zero());
+        assert!(!Vec3::new(1e-9, 1e-3, 0.0).near_zero());
+    }
+
+    #[test]
+    fn reflect_flips_normal_component() {
+        let n = Vec3::new(0.0, 1.0, 0.0);
+        assert_eq!(
+            Vec3::new(1.0, -1.0, 0.0).reflect(n),
+            Vec3::new(1.0, 1.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn refract_at_normal_incidence_goes_straight() {
+        let n = Vec3::new(0.0, 1.0, 0.0);
+        let down = Vec3::new(0.0, -1.0, 0.0);
+        assert_eq!(down.refract(n, 1.0 / 1.5), down);
+    }
+
+    #[test]
+    fn refract_with_equal_indices_does_not_bend() {
+        let n = Vec3::new(0.0, 1.0, 0.0);
+        let v = Vec3::new(1.0, -1.0, 0.0).unit();
+        let r = v.refract(n, 1.0);
+        assert!((r - v).length() < 1e-12);
+    }
+
+    #[test]
+    fn refract_obeys_snells_law() {
+        // Air (1.0) into glass (1.5) at 45°: sin(out) = sin(in) / 1.5.
+        let n = Vec3::new(0.0, 1.0, 0.0);
+        let v = Vec3::new(1.0, -1.0, 0.0).unit();
+        let r = v.refract(n, 1.0 / 1.5);
+
+        let sin_in = v.x;
+        let sin_out = r.x / r.length();
+        assert!(approx_eq(sin_out, sin_in / 1.5));
+        assert!(approx_eq(r.length(), 1.0));
+        assert!(
+            r.y < 0.0,
+            "refracted ray should keep going into the surface"
+        );
     }
 }
